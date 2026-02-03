@@ -10,11 +10,11 @@
 #include <Fonts/FreeSansBold9pt7b.h>
 
 //------Initialising the hardware pins
-#define LAMP_PIN D5
+#define LAMP_PIN D1
 #define RED_PIN D6
-#define BLUE_PIN D8
+#define BLUE_PIN D5
 #define GREEN_PIN D7
-#define buttonPin  D3  // Input pin
+//#define buttonPin  D3  // Input pin
 int lastState = HIGH;       
 
 
