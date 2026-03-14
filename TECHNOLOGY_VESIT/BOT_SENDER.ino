@@ -66,6 +66,8 @@ void loop() {
 
   data.x = map(xValue,0,4095,-245,245);
   data.y = map(yValue,0,4095,-245,245);
+  if (abs(data.x) < 30) data.x = 0;
+  if (abs(data.y) < 30) data.y = 0;
   data.button = button;
 
   esp_now_send(receiverMAC, (uint8_t *)&data, sizeof(data));
