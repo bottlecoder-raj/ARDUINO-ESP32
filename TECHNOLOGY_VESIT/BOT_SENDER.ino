@@ -64,8 +64,8 @@ void loop() {
 
   Serial.printf("X:%d  Y:%d  Button:%d\n", xValue, yValue, button);
 
-  data.x = xValue;
-  data.y = yValue;
+  data.x = map(xValue,0,4095,-245,245);
+  data.y = map(yValue,0,4095,-245,245);
   data.button = button;
 
   esp_now_send(receiverMAC, (uint8_t *)&data, sizeof(data));
