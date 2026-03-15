@@ -53,18 +53,22 @@ void SetMotor(int x, int y) {
 void setup() {
 
   Serial.begin(115200);
+  delay(1000);
+
   WiFi.mode(WIFI_STA);
-  WiFi.disconnect();     // important
+  delay(500);          // give WiFi time to start
+  WiFi.disconnect();
 
-  Serial.println("MAC ADDRESS FOR RECEIVER: ");
+  Serial.print("MAC ADDRESS FOR RECEIVER: ");
   Serial.println(WiFi.macAddress());
-  esp_now_init();
 
-   
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW Init Failed");
+    return;
+  }
 
   esp_now_register_recv_cb(OnDataRecv);
 }
-
 void loop() {
 
 }
