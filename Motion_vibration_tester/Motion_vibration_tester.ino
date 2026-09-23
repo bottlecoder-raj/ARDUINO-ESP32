@@ -6,26 +6,48 @@
 #include "arduinoFFT.h"
 
 // =================================================================
-// 1. PIN DEFINITIONS
+// 1. PIN DEFINITIONS & PWM SETTINGS
 // =================================================================
 #define BUTTON_PIN 23
-#define BUZZER_PIN 4
+#define BUZZER_PIN 32
 
-#define LED1_PIN 25  // Green LED: NORMAL
-#define LED2_PIN 26  // Yellow LED: WARNING
-#define LED3_PIN 33  // Red LED: FAULT
+#define LED1_PIN 33  // Green LED: NORMAL
+#define LED2_PIN 25  // Yellow LED: WARNING
+#define LED3_PIN 26  // Red LED: FAULT
 
 #define SDA_PIN 21
 #define SCL_PIN 22
 
+// PWM Configuration
+#define BUZZER_PWM_CHANNEL 0
+#define BUZZER_PWM_FREQ    2000 // 2kHz tone frequency
+#define BUZZER_PWM_RES     8    // 8-bit resolution (0-255)
+
+// Customized PWM Duty Cycles (10 = ON, 255 = OFF)
+#define BUZZER_ON_DUTY     128
+#define BUZZER_OFF_DUTY    255
+
 // =================================================================
 // 2. CONFIGURATION & CREDENTIALS
 // =================================================================
-#define IO_USERNAME  
-#define IO_KEY       
+#define IO_USERNAME  "Rajnarayan"
+#define IO_KEY       ""
 
-#define WIFI_SSID    
-#define WIFI_PASS    
+#define WIFI_SSID    "Raj_4g"
+#define WIFI_PASS    ""
+
+// Timers
+unsigned long lastCloudUpdate = 0;
+const unsigned long CLOUD_INTERVAL = 15000;  // 15 seconds
+
+unsigned long lastBuzzerToggle = 0;
+bool buzzerState = false;
+
+// Button Debounce and Toggle Variables
+bool isMuted = false;
+bool lastButtonState = HIGH;
+unsigned long lastDebounceTime = 0;
+const unsigned long DEBOUNCE_DELAY = 50; // ms
 
 // Sampling and FFT Settings
 #define SAMPLES 128             // Must be a power of 2
@@ -54,18 +76,36 @@ double vReal[SAMPLES];
 double vImag[SAMPLES];
 unsigned int sampling_period_us;
 
+// Helper to set buzzer output safely (PWM vs GPIO)
+void setBuzzerPWM(uint8_t duty) {
+  #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+    // Arduino ESP32 Core v3.x syntax
+    analogWrite(BUZZER_PIN, duty);
+  #else
+    // Arduino ESP32 Core v2.x syntax
+    ledcWrite(BUZZER_PWM_CHANNEL, duty);
+  #endif
+}
+
 void setup() {
   Serial.begin(115200);
 
   // Initialize GPIO Pins
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED1_PIN, OUTPUT);
   pinMode(LED2_PIN, OUTPUT);
   pinMode(LED3_PIN, OUTPUT);
 
-  // Turn off output indicators
-  digitalWrite(BUZZER_PIN, LOW);
+  // Setup ESP32 PWM Channel for Buzzer
+  #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+    pinMode(BUZZER_PIN, OUTPUT);
+  #else
+    ledcSetup(BUZZER_PWM_CHANNEL, BUZZER_PWM_FREQ, BUZZER_PWM_RES);
+    ledcAttachPin(BUZZER_PIN, BUZZER_PWM_CHANNEL);
+  #endif
+
+  // Set default state to OFF (255)
+  setBuzzerPWM(BUZZER_OFF_DUTY);
   digitalWrite(LED1_PIN, LOW);
   digitalWrite(LED2_PIN, LOW);
   digitalWrite(LED3_PIN, LOW);
@@ -93,7 +133,7 @@ void setup() {
 
   while (io.status() < AIO_CONNECTED) {
     Serial.print(".");
-    digitalWrite(LED2_PIN, !digitalRead(LED2_PIN)); // Blink yellow during connection
+    digitalWrite(LED2_PIN, !digitalRead(LED2_PIN)); 
     delay(500);
   }
   digitalWrite(LED2_PIN, LOW);
@@ -104,6 +144,26 @@ void setup() {
 
 void loop() {
   io.run();
+
+  // ---------------------------------------------------------------
+  // Check Manual Mute Button Toggle (Non-blocking with Debounce)
+  // ---------------------------------------------------------------
+  bool currentButtonReading = digitalRead(BUTTON_PIN);
+  if (currentButtonReading != lastButtonState) {
+    lastDebounceTime = millis();
+  }
+
+  if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY) {
+    static bool buttonState = HIGH;
+    if (currentButtonReading != buttonState) {
+      buttonState = currentButtonReading;
+      if (buttonState == LOW) { // Button Pressed
+        isMuted = !isMuted;
+        Serial.printf("Buzzer Mute Toggled -> %s\n", isMuted ? "MUTED" : "ENABLED");
+      }
+    }
+  }
+  lastButtonState = currentButtonReading;
 
   double sum_sq = 0;
   double peak = 0;
@@ -135,6 +195,7 @@ void loop() {
   }
 
   double rms = sqrt(sum_sq / SAMPLES);
+  Serial.printf("DEBUG -> RMS = %.3f\n", rms);
   double crest_factor = (rms > 0) ? (peak / rms) : 0;
 
   // ---------------------------------------------------------------
@@ -156,50 +217,68 @@ void loop() {
   if (anomaly_score >= 75.0) {
     machine_status = "FAULT";
     
-    // Status Indicator: Red LED
+    // Status Indicator: Red LED ON
     digitalWrite(LED1_PIN, LOW);
     digitalWrite(LED2_PIN, LOW);
     digitalWrite(LED3_PIN, HIGH);
     
-    // Local Audio Alert: Tone pattern
-    tone(BUZZER_PIN, 1000, 500);
+    // Buzzer State: Beep every 100ms
+    if (!isMuted) {
+      if (millis() - lastBuzzerToggle >= 100) {
+        lastBuzzerToggle = millis();
+        buzzerState = !buzzerState;
+        setBuzzerPWM(buzzerState ? BUZZER_ON_DUTY : BUZZER_OFF_DUTY);
+      }
+    } else {
+      setBuzzerPWM(BUZZER_OFF_DUTY);
+    }
   } else if (anomaly_score >= 35.0) {
     machine_status = "WARNING";
     
-    // Status Indicator: Yellow LED
+    // Status Indicator: Yellow LED ON
     digitalWrite(LED1_PIN, LOW);
     digitalWrite(LED2_PIN, HIGH);
     digitalWrite(LED3_PIN, LOW);
     
-    noTone(BUZZER_PIN);
+    // Buzzer State: Beep every 2 seconds (2000ms)
+    if (!isMuted) {
+      if (millis() - lastBuzzerToggle >= 2000) {
+        lastBuzzerToggle = millis();
+        buzzerState = !buzzerState;
+        setBuzzerPWM(buzzerState ? BUZZER_ON_DUTY : BUZZER_OFF_DUTY);
+      }
+    } else {
+      setBuzzerPWM(BUZZER_OFF_DUTY);
+    }
   } else {
-    // Status Indicator: Green LED
+    // Status Indicator: Green LED ON
     digitalWrite(LED1_PIN, HIGH);
     digitalWrite(LED2_PIN, LOW);
     digitalWrite(LED3_PIN, LOW);
     
-    noTone(BUZZER_PIN);
-  }
-
-  // Optional: Reset/Override state via Push Button
-  if (digitalRead(BUTTON_PIN) == LOW) {
-    noTone(BUZZER_PIN);
-    Serial.println("Manual Mute Button Pressed!");
+    // Buzzer State: OFF
+    setBuzzerPWM(BUZZER_OFF_DUTY);
   }
 
   // Serial Diagnostics Logging
-  Serial.printf("RMS: %.2f | Peak: %.2f | Crest: %.2f | Freq: %.1f Hz | Score: %.1f%% | Status: %s\n",
-                rms, peak, crest_factor, dominant_freq, anomaly_score, machine_status.c_str());
+  Serial.printf("RMS: %.2f | Peak: %.2f | Crest: %.2f | Freq: %.1f Hz | Score: %.1f%% | Status: %s | Muted: %s\n",
+                rms, peak, crest_factor, dominant_freq, anomaly_score, machine_status.c_str(), isMuted ? "YES" : "NO");
 
   // ---------------------------------------------------------------
-  // Step D: Publish Data to Adafruit IO
+  // Step D: Publish Data to Adafruit IO every 15 seconds
   // ---------------------------------------------------------------
-  feedRMS->save(rms);
-  feedPeak->save(peak);
-  feedCrest->save(crest_factor);
-  feedFreq->save(dominant_freq);
-  feedScore->save(anomaly_score);
-  feedStatus->save(machine_status);
+  if (millis() - lastCloudUpdate >= CLOUD_INTERVAL) {
 
-  delay(3000); 
+    feedRMS->save(rms);
+    feedPeak->save(peak);
+    feedCrest->save(crest_factor);
+    feedFreq->save(dominant_freq);
+    feedScore->save(anomaly_score);
+    feedStatus->save(machine_status);
+
+    lastCloudUpdate = millis();
+
+    Serial.println("Data sent to Adafruit IO");
+  }
+
 }
