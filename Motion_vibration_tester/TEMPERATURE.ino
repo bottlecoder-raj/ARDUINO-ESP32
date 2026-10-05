@@ -80,12 +80,12 @@ AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
 
 AdafruitIO_Feed *feedRMS = io.feed("vibration-rms");
 AdafruitIO_Feed *feedPeak = io.feed("vibration-peak");
-AdafruitIO_Feed *feedCrest = io.feed("crest-factor");
-AdafruitIO_Feed *feedFreq = io.feed("dominant-freq");
+// AdafruitIO_Feed *feedCrest = io.feed("crest-factor");
+// AdafruitIO_Feed *feedFreq = io.feed("dominant-freq");
 AdafruitIO_Feed *feedScore = io.feed("anomaly-score");
 AdafruitIO_Feed *feedStatus = io.feed("machine-status");
-AdafruitIO_Feed *feedStatus = io.feed("temperature");
-AdafruitIO_Feed *feedStatus = io.feed("humidity");
+AdafruitIO_Feed *feedTemperature = io.feed("temperature");
+AdafruitIO_Feed *feedHumidity = io.feed("humidity");
 
 Adafruit_MPU6050 mpu;
 ArduinoFFT<double> FFT = ArduinoFFT<double>();
