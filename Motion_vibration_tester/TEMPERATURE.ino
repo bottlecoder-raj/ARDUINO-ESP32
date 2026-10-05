@@ -9,12 +9,12 @@
 
 // Temperature settings
 #define DHTTYPE DHT11
+#define DHTPIN 4
 DHT dht(DHTPIN, DHTTYPE);
 
 // =================================================================
 // 1. PIN DEFINITIONS & PWM SETTINGS
 // =================================================================
-#define DHTPIN 4
 #define BUTTON_PIN 23
 #define BUZZER_PIN 32
 
