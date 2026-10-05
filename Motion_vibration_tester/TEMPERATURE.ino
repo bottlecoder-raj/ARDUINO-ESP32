@@ -55,6 +55,8 @@ bool isMuted = false;
 bool lastButtonState = HIGH;
 unsigned long lastDebounceTime = 0;
 const unsigned long DEBOUNCE_DELAY = 50;  // ms
+float humidity = dht.readHumidity();
+float temperature = dht.readTemperature();
 
 // Sampling and FFT Settings
 #define SAMPLES 128             // Must be a power of 2
@@ -248,8 +250,7 @@ void setup() {
 
 void loop() {
 
-  float humidity = dht.readHumidity();
-  float temperature = dht.readTemperature();
+  
   io.run();
 
   // ---------------------------------------------------------------
@@ -371,7 +372,7 @@ void loop() {
   }
 
   // Serial Diagnostics Logging
-  Serial.printf("RMS: %.2f | Peak: %.2f | Crest: %.2f | Freq: %.1f Hz | Score: %.1f%% | Status: %s | Muted: %s\n | Temp: %.2f | Hum: %.2f %",
+  Serial.printf("RMS: %.2f | Peak: %.2f | Crest: %.2f | Freq: %.1f Hz | Score: %.1f%% | Status: %s | Muted: %s\n | Temp: %.2f | Hum: %.2f %%",
                 rms, peak, crest_factor, dominant_freq, anomaly_score, machine_status.c_str(), isMuted ? "YES" : "NO",temperature,humidity);
 
   // ---------------------------------------------------------------
