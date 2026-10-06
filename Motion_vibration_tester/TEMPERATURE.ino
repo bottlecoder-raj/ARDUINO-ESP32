@@ -249,7 +249,8 @@ void setup() {
 }
 
 void loop() {
-
+ humidity = dht.readHumidity();
+ temperature = dht.readTemperature();
   
   io.run();
 
