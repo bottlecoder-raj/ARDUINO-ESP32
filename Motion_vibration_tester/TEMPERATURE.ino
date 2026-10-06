@@ -220,12 +220,12 @@ void setup() {
 
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println("DHT11 reading failed!");
-    while(1){
-      digitalWrite(LED2_PIN, HIGH);
+    //while(1){
+      digitalWrite(LED3_PIN, HIGH);
       delay(200);
-      digitalWrite(LED2_PIN, LOW);
+      digitalWrite(LED3_PIN, LOW);
       delay(200);
-    }
+   // }
   }
 
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
